@@ -1,5 +1,7 @@
 # Step0 - Connect to Azure Account
 Connect-AzAccount
+Get-AzSubscription
+
 
 # Step1 - Check to ensure that you're registered for the providers and RegistrationState is set to 'Registered'
 Get-AzResourceProvider -ProviderNamespace Microsoft.VirtualMachineImages
@@ -25,10 +27,11 @@ Import-Module Az.Accounts
 $currentAzContext = Get-AzContext
 
 # Destination image resource group
-$imageResourceGroup="avdImageDemoRg"
+$imageResourceGroup="rg-weu-avdImagefactory"
 
 # Location (see possible locations in the main docs)
-$location="westus2"
+# Get-AzLocation | select displayname,location
+$location="west europe"
 
 # Your subscription. This command gets your current subscription
 $subscriptionID=$currentAzContext.Subscription.Id
@@ -86,7 +89,7 @@ New-AzGalleryImageDefinition -GalleryName $sigGalleryName -ResourceGroupName $im
 ##############################################################################################################################################################################################################################################
 
 #  Step 5 - Download and configure the template
-$templateUrl="https://raw.githubusercontent.com/azure/azvmimagebuilder/main/solutions/14_Building_Images_WVD/armTemplateWVD.json"
+$templateUrl="https://github.com/afalcken/avdimagecreation/blob/master/armTemplateWVD.json"
 $templateFilePath = "armTemplateWVD.json"
 
 Invoke-WebRequest -Uri $templateUrl -OutFile $templateFilePath -UseBasicParsing
@@ -100,3 +103,11 @@ Invoke-WebRequest -Uri $templateUrl -OutFile $templateFilePath -UseBasicParsing
 ((Get-Content -path $templateFilePath -Raw) -replace '<sharedImageGalName>',$sigGalleryName) | Set-Content -Path $templateFilePath
 ((Get-Content -path $templateFilePath -Raw) -replace '<region1>',$location) | Set-Content -Path $templateFilePath
 ((Get-Content -path $templateFilePath -Raw) -replace '<imgBuilderId>',$identityNameResourceId) | Set-Content -Path $templateFilePath
+
+# Step 6 - Submit the template
+New-AzResourceGroupDeployment -ResourceGroupName $imageResourceGroup -TemplateFile $templateFilePath -TemplateParameterObject @{"api-Version" = "2020-02-14"} -imageTemplateName $imageTemplateName -svclocation $location
+
+# Optional - if you have any errors running the preceding command, run:
+$getStatus=$(Get-AzImageBuilderTemplate -ResourceGroupName $imageResourceGroup -Name $imageTemplateName)
+$getStatus.ProvisioningErrorCode 
+$getStatus.ProvisioningErrorMessage
